@@ -1,0 +1,40 @@
+{
+  "configVersion": 1,
+  "projectName": "client-wordpress-site",
+  "projectType": "wordpress-site",
+  "modules": ["wordpress", "web", "performance"],
+  "reportFormat": "console",
+  "baseUrl": "http://localhost:8080",
+  "timeout": 30000,
+  "moduleConfig": {
+    "wordpress": {
+      "wpPath": "/var/www/html",
+      "wpCliAvailable": true,
+      "plugins": [
+        { "slug": "woocommerce", "expectedState": "active", "testUrl": "/shop" },
+        { "slug": "yoast-seo", "expectedState": "active" },
+        { "slug": "contact-form-7", "expectedState": "active", "testUrl": "/contact" }
+      ],
+      "themes": [
+        { "slug": "astra", "expectedState": "active" }
+      ],
+      "pages": [
+        { "name": "Homepage", "path": "/", "expectedStatus": 200, "contentChecks": ["Welcome"] },
+        { "name": "Shop", "path": "/shop", "expectedStatus": 200, "contentChecks": ["Products"] },
+        { "name": "Contact", "path": "/contact", "expectedStatus": 200, "contentChecks": ["form"] }
+      ]
+    },
+    "web": {
+      "pages": [
+        { "name": "Homepage", "path": "/", "expectedStatus": 200 },
+        { "name": "Shop", "path": "/shop", "expectedStatus": 200 }
+      ]
+    },
+    "performance": {
+      "targets": [
+        { "url": "/", "maxResponseTime": 3000, "concurrentRequests": 5 },
+        { "url": "/shop", "maxResponseTime": 4000, "concurrentRequests": 5 }
+      ]
+    }
+  }
+}

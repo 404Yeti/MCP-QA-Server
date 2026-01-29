@@ -1,0 +1,55 @@
+{
+  "configVersion": 1,
+  "projectName": "my-web-app",
+  "projectType": "web-app",
+  "modules": ["web", "api", "performance"],
+  "reportFormat": "console",
+  "baseUrl": "http://localhost:3000",
+  "timeout": 30000,
+  "moduleConfig": {
+    "web": {
+      "pages": [
+        { "name": "Homepage", "path": "/", "expectedStatus": 200, "contentChecks": ["Welcome"] },
+        { "name": "Login", "path": "/login", "expectedStatus": 200 },
+        { "name": "Dashboard", "path": "/dashboard", "expectedStatus": 200, "requiresAuth": true }
+      ],
+      "forms": [
+        {
+          "name": "Login Form",
+          "page": "/login",
+          "fields": [
+            { "selector": "#email", "type": "email", "testValue": "test@example.com" },
+            { "selector": "#password", "type": "password", "testValue": "password123" }
+          ],
+          "submitSelector": "button[type=submit]",
+          "expectedResult": { "redirectTo": "/dashboard" }
+        }
+      ],
+      "workflows": [
+        {
+          "name": "User Login Flow",
+          "steps": [
+            { "action": "navigate", "url": "/login" },
+            { "action": "fill", "selector": "#email", "value": "test@example.com" },
+            { "action": "fill", "selector": "#password", "value": "password123" },
+            { "action": "click", "selector": "button[type=submit]" },
+            { "action": "waitForUrl", "url": "/dashboard" },
+            { "action": "assertVisible", "selector": ".welcome-message" }
+          ]
+        }
+      ]
+    },
+    "api": {
+      "endpoints": [
+        { "name": "Health Check", "method": "GET", "path": "/api/health", "expectedStatus": 200 },
+        { "name": "List Users", "method": "GET", "path": "/api/users", "expectedStatus": 200, "expectedBody": { "type": "array" } }
+      ]
+    },
+    "performance": {
+      "targets": [
+        { "url": "/", "maxResponseTime": 2000, "concurrentRequests": 10 },
+        { "url": "/api/health", "maxResponseTime": 500, "concurrentRequests": 50 }
+      ]
+    }
+  }
+}

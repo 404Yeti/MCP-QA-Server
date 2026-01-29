@@ -1,0 +1,40 @@
+{
+  "configVersion": 1,
+  "projectName": "my-cli-tool",
+  "projectType": "cli-tool",
+  "modules": ["cli"],
+  "reportFormat": "console",
+  "timeout": 30000,
+  "moduleConfig": {
+    "cli": {
+      "binaryPath": "./dist/index.js",
+      "commands": [
+        {
+          "name": "Version flag",
+          "args": ["--version"],
+          "expectedExitCode": 0,
+          "expectedOutput": { "pattern": "\\d+\\.\\d+\\.\\d+" }
+        },
+        {
+          "name": "Help flag",
+          "args": ["--help"],
+          "expectedExitCode": 0,
+          "expectedOutput": { "contains": ["Usage:", "Options:"] }
+        },
+        {
+          "name": "Process file",
+          "args": ["process", "test-fixtures/input.txt"],
+          "expectedExitCode": 0,
+          "expectedOutput": { "contains": ["Processed successfully"] },
+          "expectedStderr": { "empty": true }
+        },
+        {
+          "name": "Missing file error",
+          "args": ["process", "nonexistent.txt"],
+          "expectedExitCode": 1,
+          "expectedStderr": { "contains": ["File not found"] }
+        }
+      ]
+    }
+  }
+}

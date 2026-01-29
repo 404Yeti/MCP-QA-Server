@@ -1,0 +1,32 @@
+{
+  "configVersion": 1,
+  "projectName": "dev-vm-build",
+  "projectType": "vm-environment",
+  "modules": ["vm"],
+  "reportFormat": "console",
+  "timeout": 60000,
+  "moduleConfig": {
+    "vm": {
+      "tools": [
+        { "name": "Node.js", "binary": "node", "versionFlag": "--version", "expectedVersion": ">=20.0.0" },
+        { "name": "npm", "binary": "npm", "versionFlag": "--version", "expectedVersion": ">=10.0.0" },
+        { "name": "Git", "binary": "git", "versionFlag": "--version", "expectedVersion": ">=2.40.0" },
+        { "name": "Docker", "binary": "docker", "versionFlag": "--version", "expectedVersion": ">=24.0.0" },
+        { "name": "Python", "binary": "python3", "versionFlag": "--version", "expectedVersion": ">=3.10.0" }
+      ],
+      "dependencies": [
+        { "name": "TypeScript (global)", "command": "tsc --version", "expectedVersion": ">=5.0.0" },
+        { "name": "AWS CLI", "command": "aws --version", "expectedVersion": ">=2.0.0" }
+      ],
+      "configFiles": [
+        { "path": "/etc/ssh/sshd_config", "exists": true, "contains": ["PermitRootLogin no"] },
+        { "path": "~/.gitconfig", "exists": true, "contains": ["[user]"] },
+        { "path": "~/.bashrc", "exists": true }
+      ],
+      "services": [
+        { "name": "Docker daemon", "command": "systemctl is-active docker", "expectedOutput": "active" },
+        { "name": "SSH", "command": "systemctl is-active sshd", "expectedOutput": "active" }
+      ]
+    }
+  }
+}
