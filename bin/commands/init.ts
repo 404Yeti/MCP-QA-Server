@@ -1,5 +1,6 @@
 import { writeFile, access } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import inquirer from "inquirer";
 import chalk from "chalk";
 import type { ProjectType, ModuleName, ReportFormat } from "../../src/types.js";
@@ -218,7 +219,7 @@ export async function runInit(): Promise<void> {
   console.log(chalk.dim(`             "command": "node",`));
   console.log(
     chalk.dim(
-      `             "args": ["${resolve(__dirname, "../../dist/src/index.js")}"]`
+      `             "args": ["${resolve(dirname(fileURLToPath(import.meta.url)), "../../dist/src/index.js")}"]`
     )
   );
   console.log(chalk.dim(`           }`));
