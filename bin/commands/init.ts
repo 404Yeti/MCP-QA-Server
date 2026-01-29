@@ -1,5 +1,5 @@
-import { writeFile, access } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { writeFile, access, readdir } from "node:fs/promises";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import inquirer from "inquirer";
 import chalk from "chalk";
@@ -11,10 +11,36 @@ interface InitAnswers {
   projectType: ProjectType;
   baseUrl?: string;
   binaryPath?: string;
+  shellScripts?: string[];
   wpPath?: string;
   wpCliAvailable?: boolean;
   modules: ModuleName[];
   reportFormat: ReportFormat;
+}
+
+const EXCLUDED_DIRS = new Set(["node_modules", ".git", "dist", "vendor", "coverage"]);
+
+/**
+ * Recursively scan a directory for .sh files, excluding common non-project dirs.
+ */
+async function findShellScripts(dir: string): Promise<string[]> {
+  const results: string[] = [];
+
+  async function scan(current: string): Promise<void> {
+    const entries = await readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (!EXCLUDED_DIRS.has(entry.name) && !entry.name.startsWith(".")) {
+          await scan(join(current, entry.name));
+        }
+      } else if (entry.isFile() && entry.name.endsWith(".sh")) {
+        results.push(relative(dir, join(current, entry.name)));
+      }
+    }
+  }
+
+  await scan(dir);
+  return results.sort();
 }
 
 const PROJECT_TYPE_CHOICES = [
@@ -75,8 +101,10 @@ export async function runInit(): Promise<void> {
     // File doesn't exist — proceed
   }
 
-  // Gather answers
-  const answers = await inquirer.prompt<InitAnswers>([
+  // Phase 1: Basic project info
+  const basicAnswers = await inquirer.prompt<
+    Pick<InitAnswers, "projectName" | "projectType" | "baseUrl">
+  >([
     {
       type: "input",
       name: "projectName",
@@ -93,9 +121,9 @@ export async function runInit(): Promise<void> {
       type: "input",
       name: "baseUrl",
       message: "Base URL:",
-      when: (a: InitAnswers) =>
-        ["web-app", "api-service", "wordpress-site"].includes(a.projectType),
-      default: (a: InitAnswers) => {
+      when: (a) =>
+        ["web-app", "api-service", "wordpress-site"].includes(a.projectType!),
+      default: (a: Pick<InitAnswers, "projectType">) => {
         switch (a.projectType) {
           case "web-app":
             return "http://localhost:3000";
@@ -108,33 +136,87 @@ export async function runInit(): Promise<void> {
         }
       },
     },
-    {
-      type: "input",
-      name: "binaryPath",
-      message: "Path to CLI binary:",
-      when: (a: InitAnswers) => a.projectType === "cli-tool",
-      default: "./dist/index.js",
-    },
-    {
-      type: "input",
-      name: "wpPath",
-      message: "WordPress installation path:",
-      when: (a: InitAnswers) => a.projectType === "wordpress-site",
-      default: "/var/www/html",
-    },
-    {
-      type: "confirm",
-      name: "wpCliAvailable",
-      message: "Is WP-CLI available?",
-      when: (a: InitAnswers) => a.projectType === "wordpress-site",
-      default: false,
-    },
+  ]);
+
+  // Phase 2: CLI-tool specific — scan for .sh files or ask for binary path
+  let binaryPath: string | undefined;
+  let selectedScripts: string[] = [];
+
+  if (basicAnswers.projectType === "cli-tool") {
+    const shellScripts = await findShellScripts(cwd);
+
+    if (shellScripts.length > 0) {
+      console.log(
+        chalk.cyan(
+          `\n  Found ${shellScripts.length} shell script${shellScripts.length === 1 ? "" : "s"}\n`
+        )
+      );
+
+      const { scripts } = await inquirer.prompt<{ scripts: string[] }>([
+        {
+          type: "checkbox",
+          name: "scripts",
+          message: "Select shell scripts to test:",
+          choices: shellScripts.map((s) => ({
+            name: s,
+            value: s,
+            checked: true,
+          })),
+          validate: (val: string[]) =>
+            val.length > 0 || "Select at least one script",
+        },
+      ]);
+      selectedScripts = scripts;
+    } else {
+      // No .sh files found — fall back to manual binary path entry
+      const { path } = await inquirer.prompt<{ path: string }>([
+        {
+          type: "input",
+          name: "path",
+          message: "Path to CLI binary:",
+          default: "./dist/index.js",
+        },
+      ]);
+      binaryPath = path;
+    }
+  }
+
+  // Phase 3: WordPress-specific prompts
+  let wpPath: string | undefined;
+  let wpCliAvailable: boolean | undefined;
+
+  if (basicAnswers.projectType === "wordpress-site") {
+    const wpAnswers = await inquirer.prompt<{
+      wpPath: string;
+      wpCliAvailable: boolean;
+    }>([
+      {
+        type: "input",
+        name: "wpPath",
+        message: "WordPress installation path:",
+        default: "/var/www/html",
+      },
+      {
+        type: "confirm",
+        name: "wpCliAvailable",
+        message: "Is WP-CLI available?",
+        default: false,
+      },
+    ]);
+    wpPath = wpAnswers.wpPath;
+    wpCliAvailable = wpAnswers.wpCliAvailable;
+  }
+
+  // Phase 4: Module selection and report format
+  const finalAnswers = await inquirer.prompt<
+    Pick<InitAnswers, "modules" | "reportFormat">
+  >([
     {
       type: "checkbox",
       name: "modules",
       message: "Which testing modules do you need?",
-      choices: (a: InitAnswers) => {
-        const defaults = new Set(getDefaultModules(a.projectType));
+      choices: () => {
+        const defaults = new Set(getDefaultModules(basicAnswers.projectType));
         return MODULE_CHOICES.map((c) => ({
           ...c,
           checked: defaults.has(c.value),
@@ -152,6 +234,16 @@ export async function runInit(): Promise<void> {
     },
   ]);
 
+  // Merge all answers
+  const answers: InitAnswers = {
+    ...basicAnswers,
+    binaryPath,
+    shellScripts: selectedScripts,
+    wpPath,
+    wpCliAvailable,
+    ...finalAnswers,
+  };
+
   // Build config object
   const defaults = getDefaults(answers.projectType);
   const moduleConfig: Record<string, unknown> = {};
@@ -166,11 +258,24 @@ export async function runInit(): Promise<void> {
     }
   }
 
-  // Override specific fields from prompts
-  if (answers.binaryPath && moduleConfig["cli"]) {
-    (moduleConfig["cli"] as Record<string, unknown>)["binaryPath"] =
-      answers.binaryPath;
+  // Override CLI module config based on prompts
+  if (moduleConfig["cli"]) {
+    const cliCfg = moduleConfig["cli"] as Record<string, unknown>;
+
+    if (selectedScripts.length > 0) {
+      // Per-command binaryPath mode — generate a command for each selected script
+      delete cliCfg["binaryPath"];
+      cliCfg["commands"] = selectedScripts.map((script) => ({
+        name: `Test ${basename(script, ".sh")}`,
+        binaryPath: `./${script}`,
+        args: [],
+        expectedExitCode: 0,
+      }));
+    } else if (answers.binaryPath) {
+      cliCfg["binaryPath"] = answers.binaryPath;
+    }
   }
+
   if (answers.projectType === "wordpress-site" && moduleConfig["wordpress"]) {
     const wpCfg = moduleConfig["wordpress"] as Record<string, unknown>;
     if (answers.wpPath) wpCfg["wpPath"] = answers.wpPath;
@@ -203,6 +308,9 @@ export async function runInit(): Promise<void> {
   console.log(`    Modules:  ${answers.modules.join(", ")}`);
   if (answers.baseUrl) {
     console.log(`    Base URL: ${answers.baseUrl}`);
+  }
+  if (selectedScripts.length > 0) {
+    console.log(`    Scripts:  ${selectedScripts.length} shell script${selectedScripts.length === 1 ? "" : "s"} selected`);
   }
   console.log(`    Report:   ${answers.reportFormat}`);
   console.log("");

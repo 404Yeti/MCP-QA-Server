@@ -17,11 +17,16 @@ export class CliModule extends BaseModule {
     if (!cfg) return [];
 
     const errors: string[] = [];
-    if (!cfg.binaryPath) {
-      errors.push("CLI module requires 'binaryPath' to be set");
-    }
     if (!cfg.commands || cfg.commands.length === 0) {
       errors.push("CLI module has no commands configured");
+    } else if (!cfg.binaryPath) {
+      // If no module-level binaryPath, every command must have its own
+      const missing = cfg.commands.filter((c) => !c.binaryPath);
+      if (missing.length > 0) {
+        errors.push(
+          `No module-level binaryPath set and ${missing.length} command(s) missing binaryPath: ${missing.map((c) => c.name).join(", ")}`
+        );
+      }
     }
     return errors;
   }

@@ -33,6 +33,13 @@
           "args": ["process", "nonexistent.txt"],
           "expectedExitCode": 1,
           "expectedStderr": { "contains": ["File not found"] }
+        },
+        {
+          "name": "Test deploy script",
+          "binaryPath": "./scripts/deploy.sh",
+          "args": ["--dry-run"],
+          "expectedExitCode": 0,
+          "expectedOutput": { "contains": ["Dry run complete"] }
         }
       ]
     }

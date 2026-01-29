@@ -165,6 +165,7 @@ export interface ApiModuleConfig {
 
 export interface CliCommandTest {
   name: string;
+  binaryPath?: string;
   args: string[];
   cwd?: string;
   env?: Record<string, string>;
@@ -185,7 +186,7 @@ export interface CliCommandTest {
 }
 
 export interface CliModuleConfig {
-  binaryPath: string;
+  binaryPath?: string;
   commands?: CliCommandTest[];
 }
 

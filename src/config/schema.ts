@@ -119,6 +119,7 @@ const apiModuleConfigSchema = z.object({
 
 const cliCommandTestSchema = z.object({
   name: z.string(),
+  binaryPath: z.string().optional(),
   args: z.array(z.string()),
   cwd: z.string().optional(),
   env: z.record(z.string()).optional(),
@@ -150,9 +151,20 @@ const cliCommandTestSchema = z.object({
 });
 
 const cliModuleConfigSchema = z.object({
-  binaryPath: z.string(),
+  binaryPath: z.string().optional(),
   commands: z.array(cliCommandTestSchema).optional(),
-});
+}).refine(
+  (cfg) => {
+    // Valid if module-level binaryPath is set, OR every command has its own binaryPath
+    if (cfg.binaryPath) return true;
+    if (!cfg.commands || cfg.commands.length === 0) return true;
+    return cfg.commands.every((cmd) => cmd.binaryPath);
+  },
+  {
+    message:
+      "CLI module requires either a module-level 'binaryPath' or a 'binaryPath' on every command",
+  }
+);
 
 // ── VM Module ─────────────────────────────────────────────────────────────────
 
